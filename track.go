@@ -88,6 +88,7 @@ type baseTrack struct {
 	kind                  MediaDeviceType
 	selector              *CodecSelector
 	activePeerConnections map[string]chan<- chan<- struct{}
+	EncodedReader         RTPReadCloser
 }
 
 func newBaseTrack(source Source, kind MediaDeviceType, selector *CodecSelector) *baseTrack {
@@ -182,6 +183,8 @@ func (track *baseTrack) bind(ctx webrtc.TrackLocalContext, specializedTrack Trac
 	if encodedReader == nil {
 		return webrtc.RTPCodecParameters{}, errors.New(strings.Join(errReasons, "\n\n"))
 	}
+
+	track.EncodedReader = encodedReader
 
 	go func() {
 		var doneCh chan<- struct{}

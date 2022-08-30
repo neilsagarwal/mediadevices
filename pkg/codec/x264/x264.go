@@ -13,6 +13,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"github.com/pion/logging"
 	"github.com/pion/mediadevices/pkg/codec"
 	"github.com/pion/mediadevices/pkg/io/video"
 	"github.com/pion/mediadevices/pkg/prop"
@@ -23,6 +24,7 @@ type encoder struct {
 	r      video.Reader
 	mu     sync.Mutex
 	closed bool
+	log    logging.LeveledLogger
 }
 
 type cerror int
@@ -90,6 +92,7 @@ func newEncoder(r video.Reader, p prop.Media, params Params) (codec.ReadCloser, 
 	e := encoder{
 		engine: engine,
 		r:      video.ToI420(r),
+		log:    logging.NewDefaultLoggerFactory().NewLogger("x264_encoder"),
 	}
 	return &e, nil
 }
@@ -121,11 +124,29 @@ func (e *encoder) Read() ([]byte, func(), error) {
 	}
 
 	encoded := C.GoBytes(unsafe.Pointer(s.data), s.data_len)
+	e.log.Infof("encoded_bits=%d", len(encoded)*8)
 	return encoded, func() {}, err
 }
 
 // TODO: Implement bit rate control
 //var _ codec.BitRateController = (*encoder)(nil)
+
+func (e *encoder) SetBitRate(bitRate int) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	if e.closed {
+		return nil
+	}
+	// Convert from bit/s to kbit/s because x264 uses kbit/s instead.
+	bitRateC := C.int(bitRate / 1000)
+	if e.engine.param.rc.i_bitrate != bitRateC {
+		e.log.Infof("new_set_bitrate=%d", bitRate)
+		e.engine.param.rc.i_bitrate = bitRateC
+		_ = C.enc_update_params(e.engine)
+	}
+	return nil
+}
 
 func (e *encoder) ForceKeyFrame() error {
 	e.engine.force_key_frame = C.int(1)

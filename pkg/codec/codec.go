@@ -142,7 +142,7 @@ type BitRateController interface {
 	EncoderController
 	// SetBitRate sets current target bitrate, lower bitrate means smaller data will be transmitted
 	// but this also means that the quality will also be lower.
-	SetBitRate(int) error
+	SetBitRate(bitRate int) error
 }
 
 // BaseParams represents an codec's encoding properties

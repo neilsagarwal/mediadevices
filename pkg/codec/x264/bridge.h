@@ -78,6 +78,10 @@ fail:
   return NULL;
 }
 
+int enc_update_params (Encoder *e) {
+   return x264_encoder_reconfig(e->h, &e->param);
+}
+
 Slice enc_encode(Encoder *e, uint8_t *y, uint8_t *cb, uint8_t *cr, int *rc) {
   x264_nal_t *nal;
   int i_nal;
