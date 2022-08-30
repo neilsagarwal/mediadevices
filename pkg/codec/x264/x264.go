@@ -25,6 +25,8 @@ type encoder struct {
 	mu     sync.Mutex
 	closed bool
 	log    logging.LeveledLogger
+	params Params
+	p      prop.Media
 }
 
 type cerror int
@@ -93,6 +95,8 @@ func newEncoder(r video.Reader, p prop.Media, params Params) (codec.ReadCloser, 
 		engine: engine,
 		r:      video.ToI420(r),
 		log:    logging.NewDefaultLoggerFactory().NewLogger("x264_encoder"),
+		params: params,
+		p:      p,
 	}
 	return &e, nil
 }
@@ -140,10 +144,22 @@ func (e *encoder) SetBitRate(bitRate int) error {
 	}
 	// Convert from bit/s to kbit/s because x264 uses kbit/s instead.
 	bitRateC := C.int(bitRate / 1000)
+
 	if e.engine.param.rc.i_bitrate != bitRateC {
+
+		param := C.x264_param_t{
+			i_csp:        C.X264_CSP_I420,
+			i_width:      C.int(e.p.Width),
+			i_height:     C.int(e.p.Height),
+			i_keyint_max: C.int(e.params.KeyFrameInterval),
+		}
+		param.rc.i_bitrate = bitRateC
+		param.rc.i_vbv_max_bitrate = param.rc.i_bitrate
+		param.rc.i_vbv_buffer_size = param.rc.i_vbv_max_bitrate * 2
+
 		e.log.Infof("new_set_bitrate=%d", bitRate)
 		e.engine.param.rc.i_bitrate = bitRateC
-		_ = C.enc_update_params(e.engine)
+		_ = C.enc_update_params(e.engine, param)
 	}
 	return nil
 }
